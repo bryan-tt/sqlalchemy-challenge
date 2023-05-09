@@ -52,7 +52,8 @@ def welcome():
 def precipitation():
     session = Session(engine)
 
-    latest_date = engine.execute("SELECT MAX(date) FROM measurement;").fetchall()[0][0]
+    # Grab most recent date in measurement table
+    latest_date = session.execute("SELECT MAX(date) FROM measurement;").fetchall()[0][0]
     # Convert str to datetime object
     datetime_object = dt.datetime.strptime(latest_date, '%Y-%m-%d').date()
     # Calculate the date one year from the last date in data set.
@@ -69,8 +70,9 @@ def precipitation():
     ORDER BY
         date;
     """
-    data = engine.execute(sql_statement)
-    session.close()
+
+    data = session.execute(sql_statement)
+    # session.close() # figure out why this fails
 
     ytd_data = []
     for date, pcrp in data:
@@ -79,12 +81,13 @@ def precipitation():
         record_dict['pcrp'] = pcrp
         ytd_data.append(record_dict)
     
+    session.close()
     return jsonify(ytd_data)
 
 @app.route("/api/v1.0/stations")
 def stations():
     session = Session(engine)
-    data = engine.execute("SELECT station FROM station;").fetchall()
+    data = session.execute("SELECT station FROM station;").fetchall()
     session.close()
     station_list = list(np.ravel(data))
     return jsonify(station_list)
@@ -93,7 +96,7 @@ def stations():
 def tobs():
     session = Session(engine)
     # Find most recent data point in the database for the most active station 
-    latest_date = engine.execute("""
+    latest_date = session.execute("""
     SELECT
         MAX(date)
     FROM
@@ -149,7 +152,7 @@ def tobs():
                     measurement)))
         AND Measurement.date BETWEEN '{one_year_from_date}' AND '{latest_date}'
     """
-    data = engine.execute(sql_statement).fetchall()
+    data = session.execute(sql_statement).fetchall()
     session.close()
 
     tobs_list = list(np.ravel(data))
@@ -159,7 +162,7 @@ def tobs():
 @app.route("/api/v1.0/<start>")
 def start(start):
     session = Session(engine)
-    data = engine.execute(f"""
+    data = session.execute(f"""
     SELECT MIN(tobs), AVG(tobs), MAX(tobs)  
     FROM measurement
     WHERE date >= '{start}';
@@ -172,7 +175,7 @@ def start(start):
 @app.route("/api/v1.0/<start>/<end>")
 def start_end(start, end):
     session = Session(engine)
-    data = engine.execute(f"""
+    data = session.execute(f"""
         SELECT MIN(tobs), AVG(tobs), MAX(tobs) 
         FROM measurement
         WHERE date BETWEEN '{start}' AND '{end}'
